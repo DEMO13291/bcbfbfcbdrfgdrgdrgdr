@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>‎ ‎ </title>
+    <title>‎ ‎</title>
     <style>
         :root {
             --primary: #6200ee;
@@ -12,6 +12,7 @@
             --gray: #333;
             --tab-active: #1e1e1e;
             --tab-inactive: #252525;
+            --error: #ff6b6b;
         }
         * {
             box-sizing: border-box;
@@ -71,6 +72,8 @@
             white-space: nowrap;
             border-right: 1px solid #444;
             transition: 0.2s;
+            display: flex;
+            align-items: center;
         }
         .tab:hover {
             background: #2a2a2a;
@@ -100,13 +103,15 @@
             display: none;
         }
         .iframe-container.active {
-            display: block;
+            display: flex;
+            flex-direction: column;
         }
         iframe {
             width: 100%;
             height: 100%;
             border: none;
             background: white;
+            flex: 1;
         }
         /* Welcome Screen */
         .welcome-screen {
@@ -138,6 +143,21 @@
             margin-left: auto;
             background: transparent;
             border: 1px solid #555;
+        }
+        /* Error Message */
+        .iframe-error {
+            background: var(--dark);
+            color: var(--error);
+            padding: 20px;
+            text-align: center;
+            display: none;
+        }
+        .iframe-error a {
+            color: var(--primary);
+            text-decoration: none;
+        }
+        .iframe-error a:hover {
+            text-decoration: underline;
         }
     </style>
 </head>
@@ -243,14 +263,46 @@
                 welcomeScreen.classList.add('hidden');
                 let iframeContainer = document.querySelector(`.iframe-container[data-tab-id="${tabId}"]`);
                 if (!iframeContainer) {
-                    iframeContainer = document.createElement('div');
-                    iframeContainer.className = 'iframe-container';
-                    iframeContainer.dataset.tabId = tabId;
-                    iframeContainer.innerHTML = `<iframe src="${tab.url}"></iframe>`;
-                    browserContent.appendChild(iframeContainer);
+                    iframeContainer = createIframeContainer(tabId, tab.url);
                 }
                 iframeContainer.classList.add('active');
             }
+        }
+
+        // Create iframe container
+        function createIframeContainer(tabId, url) {
+            const iframeContainer = document.createElement('div');
+            iframeContainer.className = 'iframe-container';
+            iframeContainer.dataset.tabId = tabId;
+            
+            const iframe = document.createElement('iframe');
+            iframe.src = url;
+            iframe.onload = () => hideError(iframeContainer);
+            iframe.onerror = () => showError(iframeContainer, url);
+            
+            const errorEl = document.createElement('div');
+            errorEl.className = 'iframe-error';
+            
+            iframeContainer.appendChild(iframe);
+            iframeContainer.appendChild(errorEl);
+            browserContent.appendChild(iframeContainer);
+            
+            return iframeContainer;
+        }
+
+        // Show error message
+        function showError(container, url) {
+            const errorEl = container.querySelector('.iframe-error');
+            errorEl.innerHTML = `
+                <p>This site cannot be loaded. <a href="${url}" target="_blank">Open in new tab</a></p>
+            `;
+            errorEl.style.display = 'block';
+        }
+
+        // Hide error message
+        function hideError(container) {
+            const errorEl = container.querySelector('.iframe-error');
+            if (errorEl) errorEl.style.display = 'none';
         }
 
         // Close a tab
@@ -289,26 +341,23 @@
             const tab = tabs.find(t => t.id === currentTabId);
             if (tab) {
                 tab.url = url;
-                tab.title = url;
+                tab.title = new URL(url).hostname;
                 saveTabs();
 
                 // Update tab title
                 const tabEl = document.querySelector(`.tab[data-tab-id="${currentTabId}"]`);
-                if (tabEl) tabEl.textContent = url;
+                if (tabEl) tabEl.firstChild.textContent = tab.title;
 
                 // Create or update iframe
                 let iframeContainer = document.querySelector(`.iframe-container[data-tab-id="${currentTabId}"]`);
                 if (!iframeContainer) {
-                    iframeContainer = document.createElement('div');
-                    iframeContainer.className = 'iframe-container active';
-                    iframeContainer.dataset.tabId = currentTabId;
-                    iframeContainer.innerHTML = `<iframe src="${url}"></iframe>`;
-                    browserContent.appendChild(iframeContainer);
+                    iframeContainer = createIframeContainer(currentTabId, url);
                 } else {
                     iframeContainer.querySelector('iframe').src = url;
-                    iframeContainer.classList.add('active');
+                    hideError(iframeContainer);
                 }
 
+                iframeContainer.classList.add('active');
                 welcomeScreen.classList.add('hidden');
             }
         }
